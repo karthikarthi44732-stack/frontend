@@ -1,0 +1,181 @@
+// src/pages/Home.jsx
+// ─────────────────────────────────────────────────────────────────────────────
+// Movie-Stream Frontend — Home Page (Streaming)
+// ─────────────────────────────────────────────────────────────────────────────
+// Author  : ThiruXD
+// GitHub  : https://github.com/ThiruXD
+// Portfolio: https://thiruxd.is-a.dev
+// ─────────────────────────────────────────────────────────────────────────────
+
+import React, { useState, useEffect, useCallback } from "react";
+import HeroSlider from "../components/HomeHero";
+import HomeSections from "../components/HomeSections";
+import TrendingSlider from "../components/TrendingSlider";
+import SEO from "../components/SEO";
+import AdComponent from "../components/AdComponent";
+import { useSettings } from "../context/SettingsContext";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import axios from "axios";
+
+function HomeSectionRow({ section, BASE, seeMoreLink }) {
+  const [items, setItems] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (section.section_type === "loading") {
+      setIsLoading(true);
+      return;
+    }
+
+    if (section.section_type === "recently_watched") {
+      try {
+        const localList = JSON.parse(localStorage.getItem("recently_watched") || "[]");
+        setItems(localList.slice(0, section.limit || 10));
+      } catch (e) {
+        console.error("Failed to parse recently watched:", e);
+      }
+      setIsLoading(false);
+      return;
+    }
+
+    let active = true;
+    setIsLoading(true);
+    axios.get(`${BASE}/api/home-sections/${section._id}/items`)
+      .then((res) => {
+        if (active) {
+          setItems(res.data.items || []);
+          setIsLoading(false);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch section items:", err);
+        if (active) setIsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [section, BASE]);
+
+  if (!isLoading && items.length === 0 && section.section_type !== "loading") return null;
+
+  return (
+    <>
+      {section.layout === "slider" ? (
+        <TrendingSlider
+          movieData={isLoading ? [] : items}
+          isMovieDataLoading={isLoading}
+          sectionTitle={section.title}
+          sectionSeeMoreButtonLink={seeMoreLink}
+          sectionId={section._id}
+        />
+      ) : (
+        <HomeSections
+          movieData={isLoading ? [] : items}
+          isMovieDataLoading={isLoading}
+          sectionTitle={section.title}
+          sectionSeeMoreButtonLink={seeMoreLink}
+          dataType={section._id}
+        />
+      )}
+    </>
+  );
+}
+
+export default function Home() {
+  const { settings } = useSettings();
+  const BASE = import.meta.env.VITE_BASE_URL;
+  const SITENAME = settings.siteName;
+
+  const [heroPopularMovies, setHeroPopularMovies] = useState([]);
+  const [isHeroLoading, setIsHeroLoading] = useState(true);
+  const [sections, setSections] = useState([]);
+  const [isSectionsLoading, setIsSectionsLoading] = useState(true);
+
+  const loadHomeData = useCallback(() => {
+    setHeroPopularMovies([]);
+    setIsHeroLoading(true);
+    setSections([]);
+    setIsSectionsLoading(true);
+
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+
+    // 1. Fetch Hero popular movies
+    axios.get(`${BASE}/api/trending?page=1&page_size=10`)
+      .then((res) => {
+        setHeroPopularMovies(res.data.results || []);
+        setIsHeroLoading(false);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch Hero popular movies:", err);
+        setIsHeroLoading(false);
+      });
+
+    // 2. Fetch Section definitions
+    axios.get(`${BASE}/api/home-sections`)
+      .then((res) => {
+        // filter out disabled sections
+        const active = (res.data || []).filter(s => s.enabled !== false);
+        setSections(active);
+        setIsSectionsLoading(false);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch home sections list:", err);
+        setIsSectionsLoading(false);
+      });
+  }, [BASE]);
+
+  useEffect(() => {
+    loadHomeData();
+  }, [loadHomeData]);
+
+  // Mock loading sections shown while fetching section definitions
+  const mockLoadingSections = [
+    { title: "Recently Watched", layout: "slider", _id: "loading-recent", section_type: "loading" },
+    { title: "Trending Now", layout: "slider", _id: "loading-trending", section_type: "loading" },
+    { title: "Latest Movies", layout: "grid", _id: "loading-movies", section_type: "loading" },
+    { title: "Latest Series", layout: "grid", _id: "loading-series", section_type: "loading" }
+  ];
+
+  const activeSections = isSectionsLoading ? mockLoadingSections : sections;
+
+  return (
+    <div>
+      <ToastContainer style={{ fontSize: "0.8rem" }} />
+      {/* SEO SECTION */}
+      <SEO
+        title={`${SITENAME} - Watch Free Movies & TV Shows`}
+        description={`Discover a world of entertainment where every show, movie, and exclusive content takes you on a journey beyond the screen. ${SITENAME} offers endless options for every mood, helping you relax, escape, and imagine more. Stream your favorites, dream big, and repeat the experience, only with ${SITENAME}.`}
+        name={SITENAME}
+        type="website"
+        keywords="watch movies online, watch hd movies, watch full movies, streaming movies online, free streaming movie, watch movies free, watch hd movies online, watch series online, watch hd series free, free tv series, free movies online, tv online, tv links, tv links movies, free tv shows, watch tv shows online, watch tv shows online free, free hd movies, New Movie Releases, Top Movies of the Year, Watch Movies Online, Streaming Services, Movie Reviews, Upcoming Films, Best Movie Scenes, Classic Movies, HD Movie Streaming, Film Trailers, Action Movies, Drama Films, Comedy Movies, Sci-Fi Films, Horror Movie Picks, Family-Friendly Movies, Award-Winning Films, Movie Recommendations, Cinematic Experiences, Behind-the-Scenes, Director Spotlights, Actor Interviews, Film Festivals, Cult Classics, Top Box Office Hits, Celebrity News, Movie Soundtracks, Oscar-Winning Movies, Movie Trivia, Exclusive Film Content, Best Cinematography, Must-Watch Movies, Film Industry News, Filmmaking Tips, Top Movie Blogs, Latest Movie Gossip, Interactive Movie Quizzes, Red Carpet Moments, IMDb Ratings, Movie Fan Communities, fmovies, fmovies.to, fmovies to, fmovies is, fmovie, free movies, online movie, movie online, free movies online, watch movies online free, free hd movies, watch movies online"
+        link={`https://${SITENAME}.com`}
+      />
+
+      {/* HEADER - Hero and boxoffice */}
+      <div className="col-span-1 lg:col-span-2">
+        <HeroSlider
+          movieData={heroPopularMovies}
+          isMovieDataLoading={isHeroLoading}
+          dataType="heroPopularMovies"
+          sliderTypePrev="slideHeroTrendingMovies-prev"
+          sliderTypeNext="slideHeroTrendingMovies-next"
+        />
+      </div>
+
+      {activeSections.map((section, idx) => {
+        const seeMoreLink = section.media_type === "tv" ? "/Series" : "/Movies";
+
+        return (
+          <React.Fragment key={section._id || idx}>
+            <HomeSectionRow section={section} BASE={BASE} seeMoreLink={seeMoreLink} />
+            {idx === 0 && <AdComponent type="adHomeTrending" />}
+            {idx === 1 && <AdComponent type="adHomeLatest" />}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
